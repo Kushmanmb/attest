@@ -1,5 +1,9 @@
 # `actions/attest`
 
+[![CI](https://github.com/actions/attest/actions/workflows/ci.yml/badge.svg)](https://github.com/actions/attest/actions/workflows/ci.yml)
+[![Check Transpiled JavaScript](https://github.com/actions/attest/actions/workflows/check-dist.yml/badge.svg)](https://github.com/actions/attest/actions/workflows/check-dist.yml)
+[![CodeQL](https://github.com/actions/attest/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/actions/attest/actions/workflows/codeql-analysis.yml)
+
 Generate signed attestations for workflow artifacts. Internally powered by the
 [@actions/attest][1] package.
 
