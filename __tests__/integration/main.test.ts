@@ -51,6 +51,7 @@ const mockAttachArtifactToImage = jest.fn<() => Promise<Descriptor>>()
 
 // Mutable context for tests
 const mockContext = {
+  actor: 'test-actor',
   repo: { owner: 'test-owner', repo: 'test-repo' },
   payload: { repository: { visibility: 'private' } },
   serverUrl: 'https://github.com'

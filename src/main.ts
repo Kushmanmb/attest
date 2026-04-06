@@ -4,6 +4,7 @@ import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
 import { AttestResult, SigstoreInstance, createAttestation } from './attest'
+import { generateProfileBackdrop } from './backdrop'
 import {
   AttestationType,
   DetectionInputs,
@@ -217,13 +218,22 @@ const logAttestation = (
 const logSummary = async (attestation: AttestResult): Promise<void> => {
   const { attestationID } = attestation
 
+  const backdrop = generateProfileBackdrop({
+    actor: github.context.actor,
+    serverUrl: github.context.serverUrl,
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo
+  })
+  core.summary.addRaw(backdrop)
+
   /* istanbul ignore else */
   if (attestationID) {
     const url = attestationURL(attestationID)
     core.summary.addHeading('Attestation Created', 3)
     core.summary.addList([`<a href="${url}">${url}</a>`])
-    await core.summary.write()
   }
+
+  await core.summary.write()
 }
 
 const tempDir = async (): Promise<string> => {

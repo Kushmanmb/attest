@@ -118866,8 +118866,8 @@ const normalize_columns_array = function (columns) {
     const column = columns[i];
     if (column === undefined || column === null || column === false) {
       normalizedColumns[i] = { disabled: true };
-    } else if (typeof column === "string") {
-      normalizedColumns[i] = { name: column };
+    } else if (typeof column === "string" || typeof column === "number") {
+      normalizedColumns[i] = { name: `${column}` };
     } else if (is_object(column)) {
       if (typeof column.name !== "string") {
         throw new CsvError("CSV_OPTION_COLUMNS_MISSING_NAME", [
@@ -119132,7 +119132,7 @@ const normalize_options = function (opts) {
     );
   }
   // Normalize option `columns`
-  options.cast_first_line_to_header = null;
+  options.cast_first_line_to_header = undefined;
   if (options.columns === true) {
     // Fields in the first line are converted as-is to columns
     options.cast_first_line_to_header = undefined;
@@ -119687,7 +119687,7 @@ const normalize_options = function (opts) {
   // Normalize option `to`
   if (options.to === undefined || options.to === null) {
     options.to = -1;
-  } else {
+  } else if (options.to !== -1) {
     if (typeof options.to === "string" && /\d+/.test(options.to)) {
       options.to = parseInt(options.to);
     }
@@ -119706,7 +119706,7 @@ const normalize_options = function (opts) {
   // Normalize option `to_line`
   if (options.to_line === undefined || options.to_line === null) {
     options.to_line = -1;
-  } else {
+  } else if (options.to_line !== -1) {
     if (typeof options.to_line === "string" && /\d+/.test(options.to_line)) {
       options.to_line = parseInt(options.to_line);
     }
@@ -119758,6 +119758,7 @@ const boms = {
 const transform = function (original_options = {}) {
   const info = {
     bytes: 0,
+    bytes_records: 0,
     comment_lines: 0,
     empty_lines: 0,
     invalid_field_length: 0,
@@ -119845,10 +119846,14 @@ const transform = function (original_options = {}) {
               this.state.bufBytesStart += bomLength;
               buf = buf.slice(bomLength);
               // Renormalize original options with the new encoding
-              this.options = normalize_options({
+              const options = normalize_options({
                 ...this.original_options,
                 encoding: encoding,
               });
+              // Properties are merged with the existing options instance
+              for (const key in options) {
+                this.options[key] = options[key];
+              }
               // Options will re-evaluate the Buffer with the new encoding
               ({ comment, escape, quote } = this.options);
               break;
@@ -120031,7 +120036,7 @@ const transform = function (original_options = {}) {
                 this.info.comment_lines++;
                 // Skip full comment line
               } else {
-                // Activate records emition if above from_line
+                // Activate records emission if above from_line
                 if (
                   this.state.enabled === false &&
                   this.info.lines +
@@ -120429,6 +120434,7 @@ const transform = function (original_options = {}) {
           return;
         }
       }
+      this.info.bytes_records += this.info.bytes;
       push(record);
     },
     // Return a tuple with the error and the casted value
@@ -120591,10 +120597,14 @@ const transform = function (original_options = {}) {
       if (skip_records_with_error) {
         this.state.recordHasError = true;
         if (this.options.on_skip !== undefined) {
-          this.options.on_skip(
-            err,
-            raw ? this.state.rawBuffer.toString(encoding) : undefined,
-          );
+          try {
+            this.options.on_skip(
+              err,
+              raw ? this.state.rawBuffer.toString(encoding) : undefined,
+            );
+          } catch (err) {
+            return err;
+          }
         }
         // this.emit('skip', err, raw ? this.state.rawBuffer.toString(encoding) : undefined);
         return undefined;
@@ -120612,6 +120622,7 @@ const transform = function (original_options = {}) {
       const { columns, raw, encoding } = this.options;
       return {
         ...this.__infoDataSet(),
+        bytes_records: this.info.bytes,
         error: this.state.error,
         header: columns === true,
         index: this.state.record.length,
@@ -120621,8 +120632,11 @@ const transform = function (original_options = {}) {
     __infoField: function () {
       const { columns } = this.options;
       const isColumns = Array.isArray(columns);
+      // Bytes records are only incremented when all records'fields are parsed
+      const bytes_records = this.info.bytes_records;
       return {
         ...this.__infoRecord(),
+        bytes_records: bytes_records,
         column:
           isColumns === true
             ? columns.length > this.state.record.length
@@ -120653,10 +120667,13 @@ const sync_parse = function (data, opts = {}) {
     }
   };
   const close = () => {};
-  const err1 = parser.parse(data, false, push, close);
-  if (err1 !== undefined) throw err1;
-  const err2 = parser.parse(undefined, true, push, close);
-  if (err2 !== undefined) throw err2;
+  const error = parser.parse(data, true, push, close);
+  if (error !== undefined) throw error;
+  // 250606: `parser.parse` was implemented as 2 calls:
+  // const err1 = parser.parse(data, false, push, close);
+  // if (err1 !== undefined) throw err1;
+  // const err2 = parser.parse(undefined, true, push, close);
+  // if (err2 !== undefined) throw err2;
   return records;
 };
 
@@ -120945,6 +120962,47 @@ function getRegistryURL(subjectName) {
     return url.origin;
 }
 
+;// CONCATENATED MODULE: ./src/backdrop.ts
+const AVATAR_SIZE = 80;
+const BACKDROP_HEIGHT = 120;
+const BACKDROP_WIDTH = 440;
+// Generates an SVG backdrop card displaying the GitHub user profile and
+// repository information for inclusion in a workflow summary.
+const generateProfileBackdrop = (options) => {
+    const { actor, serverUrl, owner, repo } = options;
+    const avatarUrl = `${serverUrl}/${actor}.png?size=${AVATAR_SIZE}`;
+    const profileUrl = `${serverUrl}/${actor}`;
+    const repoUrl = `${serverUrl}/${owner}/${repo}`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${BACKDROP_WIDTH}" height="${BACKDROP_HEIGHT}" viewBox="0 0 ${BACKDROP_WIDTH} ${BACKDROP_HEIGHT}" role="img" aria-label="User profile backdrop for ${escapeXml(actor)}">
+  <defs>
+    <clipPath id="avatarClip">
+      <circle cx="${AVATAR_SIZE / 2 + 20}" cy="${BACKDROP_HEIGHT / 2}" r="${AVATAR_SIZE / 2}"/>
+    </clipPath>
+    <linearGradient id="backdropGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+  </defs>
+  <rect width="${BACKDROP_WIDTH}" height="${BACKDROP_HEIGHT}" rx="12" ry="12" fill="url(#backdropGrad)"/>
+  <rect width="${BACKDROP_WIDTH}" height="${BACKDROP_HEIGHT}" rx="12" ry="12" fill="none" stroke="#30363d" stroke-width="1"/>
+  <image href="${escapeXml(avatarUrl)}" x="20" y="${(BACKDROP_HEIGHT - AVATAR_SIZE) / 2}" width="${AVATAR_SIZE}" height="${AVATAR_SIZE}" clip-path="url(#avatarClip)"/>
+  <circle cx="${AVATAR_SIZE / 2 + 20}" cy="${BACKDROP_HEIGHT / 2}" r="${AVATAR_SIZE / 2}" fill="none" stroke="#30363d" stroke-width="1"/>
+  <a href="${escapeXml(profileUrl)}">
+    <text x="${AVATAR_SIZE + 32}" y="${BACKDROP_HEIGHT / 2 - 8}" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#e6edf3">${escapeXml(actor)}</text>
+  </a>
+  <a href="${escapeXml(repoUrl)}">
+    <text x="${AVATAR_SIZE + 32}" y="${BACKDROP_HEIGHT / 2 + 16}" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#8b949e">${escapeXml(owner)}/${escapeXml(repo)}</text>
+  </a>
+</svg>`;
+};
+// Escapes special XML characters to prevent injection in SVG content.
+const escapeXml = (str) => str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 ;// CONCATENATED MODULE: ./src/detect.ts
 const detectAttestationType = (inputs) => {
     const { sbomPath, predicateType, predicate, predicatePath } = inputs;
@@ -121110,6 +121168,7 @@ const mute = (str) => `${COLOR_GRAY}${str}${COLOR_DEFAULT}`;
 
 
 
+
 const ATTESTATION_FILE_NAME = 'attestation.json';
 const ATTESTATION_PATHS_FILE_NAME = 'created_attestation_paths.txt';
 /* istanbul ignore next */
@@ -121243,13 +121302,20 @@ const logAttestation = (subjects, attestation, sigstoreInstance) => {
 // Attach summary information to the GitHub Actions run
 const logSummary = async (attestation) => {
     const { attestationID } = attestation;
+    const backdrop = generateProfileBackdrop({
+        actor: github_context.actor,
+        serverUrl: github_context.serverUrl,
+        owner: github_context.repo.owner,
+        repo: github_context.repo.repo
+    });
+    summary.addRaw(backdrop);
     /* istanbul ignore else */
     if (attestationID) {
         const url = attestationURL(attestationID);
         summary.addHeading('Attestation Created', 3);
         summary.addList([`<a href="${url}">${url}</a>`]);
-        await summary.write();
     }
+    await summary.write();
 };
 const tempDir = async () => {
     const basePath = process.env['RUNNER_TEMP'];
