@@ -2,16 +2,16 @@
   "name": "actions/attest",
   "description": "Generate signed attestations for workflow artifacts",
   "version": "4.1.0",
-  "author": "",
+  "author": "Matthew Brace",
   "private": true,
   "type": "module",
-  "homepage": "https://github.com/actions/attest",
+  "homepage": "https://github.com/Kushmanmb/attest",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/actions/attest.git"
+    "url": "git+https://github.com/Kushmanmb/attest.git"
   },
   "bugs": {
-    "url": "https://github.com/actions/attest/issues"
+    "url": "https://github.com/Kushmanmb/attest/issues"
   },
   "keywords": [
     "actions",
@@ -83,7 +83,7 @@
     "@actions/github": "^9.0.0",
     "@actions/glob": "^0.6.1",
     "@sigstore/oci": "^0.6.0",
-    "csv-parse": "^5.6.0"
+    "csv-parse": "^6.2.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
